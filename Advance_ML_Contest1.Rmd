@@ -1,0 +1,1190 @@
+---
+title: "Advance_ML_Contest1"
+author: "Ali Alghaithi"
+date: "11/8/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Reading 
+```{r}
+# 
+#https://uvastatlab.github.io/2019/05/01/getting-started-with-multiple-imputation-in-r/
+
+  
+# On the Security of the Automatic Dependent Surveillance-Broadcast Protocol
+#https://arxiv.org/pdf/1307.3664.pdf
+```
+
+```{r,warning=FALSE}
+library(readr)
+library(tidyverse)
+library(ggmap)
+
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+
+
+register_google(key = "AIzaSyBcfF5Tadb-H1Bp7l_XdFFvGS1RjQ94zUs")
+has_google_key()
+library(ggmap)
+library(sf)
+library(mapview)
+
+
+
+
+locations_df <- train %>% select(ID, Latitude,Longitude) %>% filter(ID == 1)
+locations_df
+locations <- as_tibble(locations_df[1:15,])
+locations
+locations_sf <- st_as_sf(locations, coords = c("Longitude", "Latitude"), crs = 4326)
+
+mapview(locations_sf)
+
+
+```
+
+
+```{r,warning=FALSE}
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+ 
+
+summary(train)
+
+library(imputeTS)
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "stine" )
+
+}
+}
+test1<- test
+
+
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "linear" )
+}
+}
+
+test2<- test
+
+
+
+test <- (test2+ test1) /2
+
+# test[1:833,3] = F1
+# test[1:833,4] = F2
+# test[1:833,5] = F3
+# test[1:833,6] = F4
+ test[1:833,7] = M1[1]
+
+
+
+
+# zoe 
+write.csv(test, file="Ali_submission_wide.csv", row.names=FALSE)
+
+
+##### Change the file path!!! #####
+submission = test
+submission$IDTime = paste(submission$ID, submission$Time)
+## Find the row index of the test set
+k = as.vector(by(submission$ID,submission$ID,length))
+a = lapply(k, function(x){seq(1,x,by=16)})
+m = c(0,cumsum(k)[-80])
+b = lapply(1:80,function(i){a[[i]]+m[i]})
+i = unlist(b)
+## Remove the test set from prediction and generate the long table
+dat = submission[-i,-(1:2)]
+dat = reshape2::melt(dat,id="IDTime")
+dat$ID = paste(dat$IDTime, dat$variable)
+## Write the data into a new submission file
+write.csv(dat[,4:3], file="Kaggle_submission_long.csv", row.names=FALSE)
+```
+
+
+
+
+```{r}
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+head(test)
+test
+cor(train)
+train1 <- train[2:nrow(train),]
+colnames(train1) <- c("newID"  , "newTime"  , "newLatitude" , "newLongitude", "newAltB" ,"newGndSpd" ,"newVSpd" )
+all_train<- cbind(train[-nrow(train),],train1)
+
+head(all_train)
+
+cor(all_train)
+
+library(randomForest)
+
+
+mlm1 <- randomForest(newLatitude ~ Time+Latitude+ Longitude+AltB+GndSpd+VSpd, data = all_train)
+
+mlm1$coefficients
+
+fitted_data<- as.data.frame(mlm1$fitted.values)
+
+tail(fitted_data)
+tail(test)
+
+
+
+fitted_data[-c(1:69430),]
+
+
+sub <- test_try
+tail(sub)
+fitted_data[-c(1:69430),]
+sub[,3:4] = fitted_data[-c(1:69430),1:2]
+sub
+
+fitted_data[-c(1:69430),1:2]
+train
+69430 +  208288
+277718
+
+fitted_data
+ 277,717
+tail(fitted_data,17)
+ tail(test,17)
+ plot(mlm1$fitted.values)
+library(car)
+mlm2 <- update(mlm1, . ~ .)
+
+
+nd <- as.data.frame(test[i,])
+p <- predict(mlm2, nd)
+
+
+for (i in 1:889) {
+if (is.na(test[i+1,3])){i=i}else{i=i+1}
+nd <- as.data.frame(test[i,])
+p <- predict(mlm2, nd)
+test[i+1,3:4] <-as.data.frame(p)
+}
+
+new<- test
+
+
+test[1:889,3:4] = new[1:889,3:4]
+
+
+
+##### Change the file path!!! #####
+submission = sub
+submission$IDTime = paste(submission$ID, submission$Time)
+## Find the row index of the test set
+k = as.vector(by(submission$ID,submission$ID,length))
+a = lapply(k, function(x){seq(1,x,by=16)})
+m = c(0,cumsum(k)[-80])
+b = lapply(1:80,function(i){a[[i]]+m[i]})
+i = unlist(b)
+## Remove the test set from prediction and generate the long table
+dat = submission[-i,-(1:2)]
+dat = reshape2::melt(dat,id="IDTime")
+dat$ID = paste(dat$IDTime, dat$variable)
+## Write the data into a new submission file
+write.csv(dat[,4:3], file="Kaggle_submission_long.csv", row.names=FALSE)
+```
+
+
+4.5 ADS-B GENERAL
+Automatic Dependent Surveillance Broadcast
+(ADS-B) is a technology where aircraft
+avionics broadcasts the aircraft position,
+altitude, velocity and other parameters
+completely autonomously.
+The system is automatic because the pilot is
+not involved in initiating broadcasts.
+The service is dependent on the aircraft
+position determination system.
+The application is surveillance, both airground and air-air.
+When ADS-B is used, aircraft and other
+vehicles continuously broadcast a message
+including position, heading, velocity and
+intent. Other uses may include obstacles
+transmitting a position message. Aircraft,
+ground-based stations and other users
+monitoring the channels can receive the
+information and use it in a wide variety of
+applications. Because of this potential for
+broad utilization, a system using ADS-B is
+most often discussed as a replacement for or
+an augmentation to current methods of
+monitoring aeronautical traffic.
+To understand the full capability of ADS-B,
+consider how the current Air Traffic Control
+system creates information. The radar
+measures the range and bearing of an
+aircraft. Bearing is measured by the position
+of the rotating radar antenna when it receives
+a response to its interrogation from the
+aircraft, and range is measured by the time it
+takes for the radar to receive the
+interrogation response. The antenna beam
+becomes wider as the aircraft get farther
+away, making the position information less
+accurate. Additionally, detecting changes in
+aircraft velocity requires several radar
+sweeps that are spaced several seconds
+apart.
+In contrast, a system using ADS-B creates
+and listens for periodic position and intent
+reports from aircraft. These reports are
+generated and distributed using precise
+instruments, such as the global positioning
+system (GPS) and Mode S transponders,
+meaning integrity of the data is no longer
+susceptible to the range of the aircraft or the
+length of time between radar sweeps. The
+enhanced accuracy of the information will be
+used to improve safety, support a wide
+variety of applications and increase airport
+and airspace capacity.
+4.5.1 ADS-B/GICB MODES
+The IFR 6000 provides flight line test
+capability for receiving (ADS-B MON mode),
+decoding and displaying full ADS-B
+DO-260/A/B DF17/DF18 extended squitter
+transmissions from Mode S transponders or
+DF18 extended squitters from 1090 MHz
+emitters. Capability to generate (ADS-B GEN
+mode) full DO-260/A/B DF17/DF18 extended
+squitter transmissions for testing ADS-B
+receivers is provided. A GICB mode fully
+decodes and displays all Enhanced
+Surveillance BDS register contents. The
+ADS-B/GICB is a Sub-Mode of XPDR Mode
+
+
+
+
+```{r}
+
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+
+
+
+library(dplyr)
+x <- train %>% filter(ID ==1)
+
+# Latitude
+x <- x %>% mutate(startLatitude = NA)
+x <- x %>% mutate(EndLatitude = NA)
+x <- x %>% mutate(AvgLatitude = NA)
+# Longitude
+x <- x %>% mutate(startLongitude = NA)
+x <- x %>% mutate(EndLongitude = NA)
+x <- x %>% mutate(AvgLongitude = NA)
+
+# AltB
+x <- x %>% mutate(startAltB = NA)
+x <- x %>% mutate(EndAltB = NA)
+x <- x %>% mutate(AvgAltB = NA)
+
+# GndSpd
+x <- x %>% mutate(startGndSpd = NA)
+x <- x %>% mutate(EndGndSpd = NA)
+x <- x %>% mutate(AvgGndSpd = NA)
+
+# VSpd
+x <- x %>% mutate(startVSpd = NA)
+x <- x %>% mutate(EndVSpd = NA)
+x <- x %>% mutate(AvgVSpd = NA)
+
+i=1
+while(i <= nrow(x)){
+  c = i+16
+  if(c>nrow(x)){c=nrow(x)}
+  # Latitude
+ x$startLatitude[i:c] = x$Latitude[i]
+ x$EndLatitude[i:c] = x$Latitude[c]
+ x$AvgLatitude[i:c] = (x$Latitude[i] + x$Latitude[c])/2
+  
+#Longitude
+ x$startLongitude[i:c] = x$Longitude[i]
+ x$EndLongitude[i:c] = x$Longitude[c]
+ x$AvgLongitude[i:c] = (x$Longitude[i] + x$Longitude[c])/2
+
+# AltB
+ x$startAltB[i:c] = x$AltB[i]
+ x$EndAltB[i:c] = x$AltB[c]
+ x$AvgAltB[i:c] = (x$AltB[i] + x$AltB[c])/2
+# GndSpd
+ x$startGndSpd[i:c] = x$GndSpd[i]
+ x$EndGndSpd[i:c] = x$GndSpd[c]
+ x$AvgGndSpd[i:c] = (x$GndSpd[i] + x$GndSpd[c])/2
+ 
+#VSpd
+ x$startVSpd[i:c] = x$VSpd[i]
+ x$EndVSpd[i:c] = x$VSpd[c]
+ x$AvgVSpd[i:c] = (x$VSpd[i] + x$VSpd[c])/2
+ 
+
+i= i +16
+  }
+
+
+
+
+train1 <- x[2:nrow(x),]
+colnames(train1) <- c("step1ID"        ,     "step1Time"       ,    "step1Latitude"  ,     "step1Longitude"  ,   
+ "step1AltB"      ,     "step1GndSpd"     ,    "step1VSpd"     ,      "step1startLatitude" ,
+ "step1EndLatitude"   , "step1AvgLatitude"   , "step1startLongitude" ,"step1EndLongitude",  
+ "step1AvgLongitude",   "step1startAltB"  ,    "step1EndAltB"    ,    "step1AvgAltB"  ,     
+ "step1startGndSpd"  ,  "step1EndGndSpd"   ,   "step1AvgGndSpd"  )
+
+train2 <- x[3:nrow(x),]
+colnames(train2) <- c("step2ID"        ,     "step2Time"       ,    "step2Latitude"  ,     "step2Longitude"  ,   
+ "step2AltB"      ,     "step2GndSpd"     ,    "step2VSpd"     ,      "step2startLatitude" ,
+ "step2EndLatitude"   , "step2AvgLatitude"   , "step2startLongitude" ,"step2EndLongitude",  
+ "step2AvgLongitude",   "step2startAltB"  ,    "step2EndAltB"    ,    "step2AvgAltB"  ,     
+ "step2startGndSpd"  ,  "step2EndGndSpd"   ,   "step2AvgGndSpd"  )
+
+
+train3 <- x[4:nrow(x),]
+colnames(train3) <- c("step3ID"        ,     "step3Time"       ,    "step3Latitude"  ,         "step3Longitude"  ,   
+ "step3AltB"      ,     "step3GndSpd"     ,    "step3VSpd"     ,      "step3startLatitude" ,
+ "step3EndLatitude"   , "step3AvgLatitude"   , "step3startLongitude" ,"step3EndLongitude",  
+ "step3AvgLongitude",   "step3startAltB"  ,    "step3EndAltB"    ,    "step3AvgAltB"  ,     
+ "step3startGndSpd"  ,  "step3EndGndSpd"   ,   "step3AvgGndSpd"  )
+
+
+train4 <- x[5:nrow(x),]
+colnames(train4) <- 
+  c("step4ID"          ,"step4Time"        ,"step4Latitude"        ,"step4Longitude"     ,   
+    "step4AltB"        ,"step4GndSpd"      ,"step4VSpd"            ,"step4startLatitude" ,
+    "step4EndLatitude" ,"step4AvgLatitude" ,"step4startLongitude"  ,"step4EndLongitude",  
+    "step4AvgLongitude","step4startAltB"   ,"step4EndAltB"         ,"step4AvgAltB"  ,     
+    "step4startGndSpd","step4EndGndSpd"   ,"step4AvgGndSpd"  )
+
+
+
+train5 <- x[6:nrow(x),]
+colnames(train5) <- 
+  c("step5ID"          ,"step5Time"        ,"step5Latitude"        ,"step5Longitude"     ,   
+    "step5AltB"        ,"step5GndSpd"      ,"step5VSpd"            ,"step5startLatitude" ,
+    "step5EndLatitude" ,"step5AvgLatitude" ,"step5startLongitude"  ,"step5EndLongitude",  
+    "step5AvgLongitude","step5startAltB"   ,"step5EndAltB"         ,"step5AvgAltB"  ,     
+    "step5startGndSpd" ,"step5EndGndSpd"   ,"step5AvgGndSpd"  )
+
+
+
+train6 <- x[7:nrow(x),]
+colnames(train6) <- 
+  c("step6ID"          ,"step6Time"        ,"step6Latitude"        ,"step6Longitude"     ,   
+    "step6AltB"        ,"step6GndSpd"      ,"step6VSpd"            ,"step6startLatitude" ,
+    "step6EndLatitude" ,"step6AvgLatitude" ,"step6startLongitude"  ,"step6EndLongitude",  
+    "step6AvgLongitude","step6startAltB"   ,"step6EndAltB"         ,"step6AvgAltB"  ,     
+    "step6startGndSpd" ,"step6EndGndSpd"   ,"step6AvgGndSpd"  )
+
+
+
+
+train7 <- x[8:nrow(x),]
+colnames(train7) <- 
+  c("step7ID"          ,"step7Time"        ,"step7Latitude"        ,"step7Longitude"     ,   
+    "step7AltB"        ,"step7GndSpd"      ,"step7VSpd"            ,"step7startLatitude" ,
+    "step7EndLatitude" ,"step7AvgLatitude" ,"step7startLongitude"  ,"step7EndLongitude",  
+    "step7AvgLongitude","step7startAltB"   ,"step7EndAltB"         ,"step7AvgAltB"  ,     
+    "step7startGndSpd" ,"step7EndGndSpd"   ,"step7AvgGndSpd"  )
+
+
+
+
+
+train8 <- x[9:nrow(x),]
+colnames(train8) <- 
+  c("step8ID"          ,"step8Time"        ,"step8Latitude"        ,"step8Longitude"     ,   
+    "step8AltB"        ,"step8GndSpd"      ,"step8VSpd"            ,"step8startLatitude" ,
+    "step8EndLatitude" ,"step8AvgLatitude" ,"step8startLongitude"  ,"step8EndLongitude",  
+    "step8AvgLongitude","step8startAltB"   ,"step8EndAltB"         ,"step8AvgAltB"  ,     
+    "step8startGndSpd" ,"step8EndGndSpd"   ,"step8AvgGndSpd"  )
+
+
+train9 <- x[10:nrow(x),]
+colnames(train9) <- 
+  c("step9ID"          ,"step9Time"        ,"step9Latitude"        ,"step9Longitude"     ,   
+    "step9AltB"        ,"step9GndSpd"      ,"step9VSpd"            ,"step9startLatitude" ,
+    "step9EndLatitude" ,"step9AvgLatitude" ,"step9startLongitude"  ,"step9EndLongitude",  
+    "step9AvgLongitude","step9startAltB"   ,"step9EndAltB"         ,"step9AvgAltB"  ,     
+    "step9startGndSpd" ,"step9EndGndSpd"   ,"step9AvgGndSpd"  )
+
+
+train10 <- x[11:nrow(x),]
+colnames(train10) <- 
+  c("step10ID"          ,"step10Time"        ,"step10Latitude"        ,"step10Longitude"     ,   
+    "step10AltB"        ,"step10GndSpd"      ,"step10VSpd"            ,"step10startLatitude" ,
+    "step10EndLatitude" ,"step10AvgLatitude" ,"step10startLongitude"  ,"step10EndLongitude",  
+    "step10AvgLongitude","step10startAltB"   ,"step10EndAltB"         ,"step10AvgAltB"  ,     
+    "step10startGndSpd" ,"step10EndGndSpd"   ,"step10AvgGndSpd"  )
+
+
+train11 <- x[12:nrow(x),]
+colnames(train11) <- 
+  c("step11ID"          ,"step11Time"        ,"step11Latitude"        ,"step11Longitude"     ,   
+    "step11AltB"        ,"step11GndSpd"      ,"step11VSpd"            ,"step11startLatitude" ,
+    "step11EndLatitude" ,"step11AvgLatitude" ,"step11startLongitude"  ,"step11EndLongitude",  
+    "step11AvgLongitude","step11startAltB"   ,"step11EndAltB"         ,"step11AvgAltB"  ,     
+    "step11startGndSpd" ,"step11EndGndSpd"   ,"step11AvgGndSpd"  )
+
+train12 <- x[13:nrow(x),]
+colnames(train12) <- 
+  c("step12ID"          ,"step12Time"        ,"step12Latitude"        ,"step12Longitude"     ,   
+    "step12AltB"        ,"step12GndSpd"      ,"step12VSpd"            ,"step12startLatitude" ,
+    "step12EndLatitude" ,"step12AvgLatitude" ,"step12startLongitude"  ,"step12EndLongitude",  
+    "step12AvgLongitude","step12startAltB"   ,"step12EndAltB"         ,"step12AvgAltB"  ,     
+    "step12startGndSpd" ,"step12EndGndSpd"   ,"step12AvgGndSpd"  )
+
+
+train13 <- x[14:nrow(x),]
+colnames(train13) <- 
+  c("step13ID"          ,"step13Time"        ,"step13Latitude"        ,"step13Longitude"     ,   
+    "step13AltB"        ,"step13GndSpd"      ,"step13VSpd"            ,"step13startLatitude" ,
+    "step13EndLatitude" ,"step13AvgLatitude" ,"step13startLongitude"  ,"step13EndLongitude",  
+    "step13AvgLongitude","step13startAltB"   ,"step13EndAltB"         ,"step13AvgAltB"  ,     
+    "step13startGndSpd" ,"step13EndGndSpd"   ,"step13AvgGndSpd"  )
+
+
+train14 <- x[15:nrow(x),]
+colnames(train14) <- 
+  c("step14ID"          ,"step14Time"        ,"step14Latitude"        ,"step14Longitude"     ,   
+    "step14AltB"        ,"step14GndSpd"      ,"step14VSpd"            ,"step14startLatitude" ,
+    "step14EndLatitude" ,"step14AvgLatitude" ,"step14startLongitude"  ,"step14EndLongitude",  
+    "step14AvgLongitude","step14startAltB"   ,"step14EndAltB"         ,"step14AvgAltB"  ,     
+    "step14startGndSpd" ,"step14EndGndSpd"   ,"step14AvgGndSpd"  )
+
+
+train15 <- x[16:nrow(x),]
+colnames(train15) <- 
+  c("step15ID"          ,"step15Time"        ,"step15Latitude"        ,"step15Longitude"     ,   
+    "step15AltB"        ,"step15GndSpd"      ,"step15VSpd"            ,"step15startLatitude" ,
+    "step15EndLatitude" ,"step15AvgLatitude" ,"step15startLongitude"  ,"step15EndLongitude",  
+    "step15AvgLongitude","step15startAltB"   ,"step15EndAltB"         ,"step15AvgAltB"  ,     
+    "step15startGndSpd" ,"step15EndGndSpd"   ,"step15AvgGndSpd"  )
+
+x <- head(x,-15)
+train1<- head(train1,-14)
+train2<- head(train2,-13)
+train3<- head(train3,-12)
+train4<- head(train4,-11)
+train5<- head(train5,-10)
+train6<- head(train6,-9)
+train7<- head(train7,-8)
+train8<- head(train8,-7)
+train9<- head(train9,-6)
+train10<- head(train10,-5)
+train11<- head(train11,-4)
+train12<- head(train12,-3)
+train13<- head(train13,-2)
+train14<- head(train14,-1)
+train14
+
+```
+
+
+
+
+
+# Step1_mode_ modeling 
+```{r}
+Step1_Mdata <- x %>% 
+    select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+Step1_Mdata
+
+library(randomForest)
+# step1Latitude
+mod_step1Latitude<- randomForest(train1$step1Latitude ~.,Step1_Mdata)
+# step1Longitude
+mod_step1Longitude <- randomForest(train1$step1Longitude ~.,Step1_Mdata)
+# step1AltB
+mod_step1AltB <- randomForest(train1$step1AltB ~.,Step1_Mdata)
+# step1GndSpd
+mod_step1GndSpd<- randomForest(train1$step1GndSpd ~.,Step1_Mdata)
+# step1VSpd
+mod_step1VSpd<-randomForest(train1$step1VSpd ~.,Step1_Mdata)
+```
+
+
+# Step2_mode_ modeling 
+```{r}
+
+Step2_Mdata <- cbind(x,train1)
+Step2_Mdata <- Step2_Mdata %>% 
+    select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+Step2_Mdata
+library(randomForest)
+# step2Latitude
+mod_step2Latitude<- randomForest(train2$step2Latitude ~.,Step2_Mdata)
+# step2Longitude
+mod_step2Longitude<- randomForest(train2$step2Longitude ~.,Step2_Mdata)
+# step2AltB
+mod_step2AltB<-randomForest(train2$step2AltB ~.,Step2_Mdata)
+# step2GndSpd
+mod_step2GndSpd <-randomForest(train2$step2GndSpd ~.,Step2_Mdata)
+# step2VSpd
+mod_step2VSpd<- randomForest(train2$step2VSpd ~.,Step2_Mdata)
+```
+# Step3_mode_ modeling 
+```{r}
+
+Step3_Mdata <- cbind(x,train1,train2)
+Step3_Mdata <- Step3_Mdata %>% 
+    select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+library(randomForest)
+# step3Latitude
+mod_step3Latitude<-randomForest(train3$step3Latitude ~.,Step3_Mdata)
+# step3Longitude
+mod_step3Longitude<-randomForest(train3$step3Longitude ~.,Step3_Mdata)
+# step3AltB
+mod_step3AltB<-randomForest(train3$step3AltB ~.,Step3_Mdata)
+# step3GndSpd
+mod_step3GndSpd<- randomForest(train3$step3GndSpd ~.,Step3_Mdata)
+# step3VSpd
+mod_step3VSpd <- randomForest(train3$step3VSpd ~.,Step3_Mdata)
+```
+
+
+
+
+```{r}
+# prepare test data
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+
+library(dplyr)
+x <- test %>% filter(ID ==31)
+
+# Latitude
+x <- x %>% mutate(startLatitude = NA)
+x <- x %>% mutate(EndLatitude = NA)
+x <- x %>% mutate(AvgLatitude = NA)
+# Longitude
+x <- x %>% mutate(startLongitude = NA)
+x <- x %>% mutate(EndLongitude = NA)
+x <- x %>% mutate(AvgLongitude = NA)
+
+# AltB
+x <- x %>% mutate(startAltB = NA)
+x <- x %>% mutate(EndAltB = NA)
+x <- x %>% mutate(AvgAltB = NA)
+
+# GndSpd
+x <- x %>% mutate(startGndSpd = NA)
+x <- x %>% mutate(EndGndSpd = NA)
+x <- x %>% mutate(AvgGndSpd = NA)
+
+# VSpd
+x <- x %>% mutate(startVSpd = NA)
+x <- x %>% mutate(EndVSpd = NA)
+x <- x %>% mutate(AvgVSpd = NA)
+
+i=1
+while (i <= 833 ){
+  c = i+16
+  if(c>833 ){c=833 }
+  # Latitude
+ x$startLatitude[i:c] = x$Latitude[i]
+ x$EndLatitude[i:c] = x$Latitude[c]
+x$AvgLatitude[i:c] = (x$Latitude[i] + x$Latitude[c])/2
+  
+#Longitude
+ x$startLongitude[i:c] = x$Longitude[i]
+ x$EndLongitude[i:c] = x$Longitude[c]
+x$AvgLongitude[i:c] = (x$Longitude[i] + x$Longitude[c])/2
+
+# AltB
+ x$startAltB[i:c] = x$AltB[i]
+ x$EndAltB[i:c] = x$AltB[c]
+x$AvgAltB[i:c] = (x$AltB[i] + x$AltB[c])/2
+# GndSpd
+ x$startGndSpd[i:c] = x$GndSpd[i]
+ x$EndGndSpd[i:c] = x$GndSpd[c]
+x$AvgGndSpd[i:c] = (x$GndSpd[i] + x$GndSpd[c])/2
+
+#VSpd
+ x$startVSpd[i:c] = x$VSpd[i]
+ x$EndVSpd[i:c] = x$VSpd[c]
+ x$AvgVSpd[i:c] = (x$VSpd[i] + x$VSpd[c])/2
+
+i= i +16
+  }
+y<-x
+
+
+
+predict(mod_step1Latitude,y[1,])
+predict(mod_step1Longitude,y[1,])
+predict(mod_step1AltB,y[1,])
+predict(mod_step1GndSpd,y[1,])
+predict(mod_step1VSpd,y[1,])
+
+
+
+```
+
+# Step4_mode_ modeling 
+```{r}
+
+Step4_Mdata <- cbind(x,train1,train2,train3)
+Step4_Mdata <- Step4_Mdata %>% 
+    select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+library(randomForest)
+# step1Latitude
+randomForest(train4$step4Latitude ~.,Step4_Mdata)
+# step1Longitude
+randomForest(train4$step4Longitude ~.,Step4_Mdata)
+# step1AltB
+randomForest(train4$step4AltB ~.,Step4_Mdata)
+# step1GndSpd
+randomForest(train4$step4GndSpd ~.,Step4_Mdata)
+# step1VSpd
+randomForest(train4$step4VSpd ~.,Step4_Mdata)
+```
+
+# Step5_mode_ modeling 
+```{r}
+Step5_Mdata <- cbind(x,train1,train2,train3,train4)
+Step5_Mdata <- Step5_Mdata %>% 
+    select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+library(randomForest)
+# step1Latitude
+randomForest(train5$step5Latitude ~.,Step5_Mdata)
+# step1Longitude
+randomForest(train5$step5Longitude ~.,Step5_Mdata)
+# step1AltB
+randomForest(train5$step5AltB ~.,Step5_Mdata)
+# step1GndSpd
+randomForest(train5$step5GndSpd ~.,Step5_Mdata)
+# step1VSpd
+randomForest(train5$step5VSpd ~.,Step5_Mdata)
+```
+
+
+# #################3
+
+```{r}
+
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+
+
+for (j in unique(train$ID)){
+
+library(dplyr)
+x <- train %>% filter(ID ==j)
+
+# Latitude
+x <- x %>% mutate(startLatitude = NA)
+x <- x %>% mutate(EndLatitude = NA)
+x <- x %>% mutate(AvgLatitude = NA)
+# Longitude
+x <- x %>% mutate(startLongitude = NA)
+x <- x %>% mutate(EndLongitude = NA)
+x <- x %>% mutate(AvgLongitude = NA)
+
+# AltB
+x <- x %>% mutate(startAltB = NA)
+x <- x %>% mutate(EndAltB = NA)
+x <- x %>% mutate(AvgAltB = NA)
+
+# GndSpd
+x <- x %>% mutate(startGndSpd = NA)
+x <- x %>% mutate(EndGndSpd = NA)
+x <- x %>% mutate(AvgGndSpd = NA)
+
+# VSpd
+x <- x %>% mutate(startVSpd = NA)
+x <- x %>% mutate(EndVSpd = NA)
+x <- x %>% mutate(AvgVSpd = NA)
+
+i=1
+while (i <= nrow(x)){
+  c = i+16
+  if(c>nrow(x)){c=nrow(x)}
+  # Latitude
+ x$startLatitude[i:c] = x$Latitude[i]
+ x$EndLatitude[i:c] = x$Latitude[c]
+x$AvgLatitude[i:c] = (x$Latitude[i] + x$Latitude[c])/2
+  
+#Longitude
+ x$startLongitude[i:c] = x$Longitude[i]
+ x$EndLongitude[i:c] = x$Longitude[c]
+x$AvgLongitude[i:c] = (x$Longitude[i] + x$Longitude[c])/2
+
+# AltB
+ x$startAltB[i:c] = x$AltB[i]
+ x$EndAltB[i:c] = x$AltB[c]
+ x$AvgAltB[i:c] = (x$AltB[i] + x$AltB[c])/2
+
+ # GndSpd
+ x$startGndSpd[i:c] = x$GndSpd[i]
+ x$EndGndSpd[i:c] = x$GndSpd[c]
+ x$AvgGndSpd[i:c] = (x$GndSpd[i] + x$GndSpd[c])/2
+
+#VSpd
+ x$startVSpd[i:c] = x$VSpd[i]
+ x$EndVSpd[i:c] = x$VSpd[c]
+ x$AvgVSpd[i:c] = (x$VSpd[i] + x$VSpd[c])/2
+
+
+i= i +16
+}
+
+if(j==1){x1=x}
+x1 <- rbind(x1,x)
+
+}
+
+
+x1 <- x1[-c(1:1077),]
+write.csv(x1, file="train_with_extra_var_and_into.csv", row.names=FALSE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Ali +Zoe Idea
+
+
+#Prepare Train
+```{r}
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+
+library(dplyr)
+train = as.data.frame(train)
+train1 <- train 
+x <- train 
+
+# create test like data
+i=2
+while (i <= nrow(x)) {
+  m= i+14
+if(m>nrow(x)){m=nrow(x)}
+  x[i:m,3:7] = NA
+  i= i +16}
+
+InData1<- x
+InData2<- x
+
+library(imputeTS)
+for (i in unique(InData1$ID)){
+for (j in 3:7){
+InData1[InData1$ID == i, j] = na.interpolation(InData1[InData1$ID == i, j], option = "stine" )
+}
+}
+
+
+for (i in unique(InData2$ID)){
+for (j in 3:7){
+InData2[InData2$ID == i, j] = na.interpolation(InData2[InData2$ID == i, j], option = "linear" )
+}
+}
+
+
+InData12 <-(InData1+InData2) / 2 
+
+
+colnames(train1) <- c("yID"  , "yTime"  , "yLatitude" , "yLongitude", "yAltB" ,"yGndSpd" ,"yVSpd" )
+
+all_train<- cbind(InData12,train1)
+all_train <- all_train %>% select(ends_with(c("Latitude","Longitude","AltB","GndSpd","VSpd")))
+
+head(all_train)
+```
+
+
+```{r}
+
+library(dplyr)
+x <- all_train
+
+# Latitude
+x <- x %>% mutate(startLatitude = NA)
+x <- x %>% mutate(EndLatitude = NA)
+x <- x %>% mutate(AvgLatitude = NA)
+# Longitude
+x <- x %>% mutate(startLongitude = NA)
+x <- x %>% mutate(EndLongitude = NA)
+x <- x %>% mutate(AvgLongitude = NA)
+
+# AltB
+x <- x %>% mutate(startAltB = NA)
+x <- x %>% mutate(EndAltB = NA)
+x <- x %>% mutate(AvgAltB = NA)
+
+# GndSpd
+x <- x %>% mutate(startGndSpd = NA)
+x <- x %>% mutate(EndGndSpd = NA)
+x <- x %>% mutate(AvgGndSpd = NA)
+
+# VSpd
+x <- x %>% mutate(startVSpd = NA)
+x <- x %>% mutate(EndVSpd = NA)
+x <- x %>% mutate(AvgVSpd = NA)
+
+i=1
+while (i <= nrow(x)){
+  c = i+16
+  if(c>nrow(x)){c=nrow(x)}
+  # Latitude
+ x$startLatitude[i:c] = x$Latitude[i]
+ x$EndLatitude[i:c] = x$Latitude[c]
+x$AvgLatitude[i:c] = (x$Latitude[i] + x$Latitude[c])/2
+  
+#Longitude
+ x$startLongitude[i:c] = x$Longitude[i]
+ x$EndLongitude[i:c] = x$Longitude[c]
+x$AvgLongitude[i:c] = (x$Longitude[i] + x$Longitude[c])/2
+
+# AltB
+ x$startAltB[i:c] = x$AltB[i]
+ x$EndAltB[i:c] = x$AltB[c]
+ x$AvgAltB[i:c] = (x$AltB[i] + x$AltB[c])/2
+
+ # GndSpd
+ x$startGndSpd[i:c] = x$GndSpd[i]
+ x$EndGndSpd[i:c] = x$GndSpd[c]
+ x$AvgGndSpd[i:c] = (x$GndSpd[i] + x$GndSpd[c])/2
+
+#VSpd
+ x$startVSpd[i:c] = x$VSpd[i]
+ x$EndVSpd[i:c] = x$VSpd[c]
+ x$AvgVSpd[i:c] = (x$VSpd[i] + x$VSpd[c])/2
+
+
+i= i +16
+  }
+
+#write.csv(test, file="Ali_submission_wide.csv", row.names=FALSE)
+
+
+
+```
+
+
+
+
+
+# model part 
+```{r}
+mLatitude <- lm(yLatitude ~  Latitude*Longitude*VSpd*GndSpd*AltB, data = all_train)
+mLongitude <- lm( yLongitude~ Latitude*Longitude*VSpd*GndSpd*AltB, data = all_train)
+mAltB<- lm( yAltB~ Latitude*Longitude*VSpd*GndSpd*AltB, data = all_train)
+mGndSpd <- lm( yGndSpd~ Latitude*Longitude*VSpd*GndSpd*AltB, data = all_train)
+mVSpd <- lm( yVSpd~ Latitude*Longitude*VSpd*GndSpd*AltB ,data = all_train)
+
+```
+
+
+
+# predictions part 
+```{r}
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+
+test1 <- test %>% filter(ID ==33)
+library(dplyr)
+x <- test %>% filter(ID ==33)
+
+InData1<- x
+InData2<- x
+
+library(imputeTS)
+for (i in unique(InData1$ID)){
+for (j in 3:7){
+InData1[InData1$ID == i, j] = na.interpolation(InData1[InData1$ID == i, j], option = "stine" )
+}
+}
+
+
+for (i in unique(InData2$ID)){
+for (j in 3:7){
+InData2[InData2$ID == i, j] = na.interpolation(InData2[InData2$ID == i, j], option = "linear" )
+}
+}
+
+InData12 <-(InData1+InData2) / 2 
+
+
+library(dplyr)
+x <- InData12
+
+# Latitude
+x <- x %>% mutate(startLatitude = NA)
+x <- x %>% mutate(EndLatitude = NA)
+x <- x %>% mutate(AvgLatitude = NA)
+# Longitude
+x <- x %>% mutate(startLongitude = NA)
+x <- x %>% mutate(EndLongitude = NA)
+x <- x %>% mutate(AvgLongitude = NA)
+
+# AltB
+x <- x %>% mutate(startAltB = NA)
+x <- x %>% mutate(EndAltB = NA)
+x <- x %>% mutate(AvgAltB = NA)
+
+# GndSpd
+x <- x %>% mutate(startGndSpd = NA)
+x <- x %>% mutate(EndGndSpd = NA)
+x <- x %>% mutate(AvgGndSpd = NA)
+
+# VSpd
+x <- x %>% mutate(startVSpd = NA)
+x <- x %>% mutate(EndVSpd = NA)
+x <- x %>% mutate(AvgVSpd = NA)
+
+i=1
+while (i <= nrow(x)){
+  c = i+16
+  if(c>nrow(x)){c=nrow(x)}
+  # Latitude
+ x$startLatitude[i:c] = x$Latitude[i]
+ x$EndLatitude[i:c] = x$Latitude[c]
+x$AvgLatitude[i:c] = (x$Latitude[i] + x$Latitude[c])/2
+  
+#Longitude
+ x$startLongitude[i:c] = x$Longitude[i]
+ x$EndLongitude[i:c] = x$Longitude[c]
+x$AvgLongitude[i:c] = (x$Longitude[i] + x$Longitude[c])/2
+
+# AltB
+ x$startAltB[i:c] = x$AltB[i]
+ x$EndAltB[i:c] = x$AltB[c]
+ x$AvgAltB[i:c] = (x$AltB[i] + x$AltB[c])/2
+
+ # GndSpd
+ x$startGndSpd[i:c] = x$GndSpd[i]
+ x$EndGndSpd[i:c] = x$GndSpd[c]
+ x$AvgGndSpd[i:c] = (x$GndSpd[i] + x$GndSpd[c])/2
+
+#VSpd
+ x$startVSpd[i:c] = x$VSpd[i]
+ x$EndVSpd[i:c] = x$VSpd[c]
+ x$AvgVSpd[i:c] = (x$VSpd[i] + x$VSpd[c])/2
+
+
+i= i +16
+  }
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# Prediction part 
+```{r}
+F1 <- predict(mLatitude,InData12)
+F2 <- predict(mLongitude,InData12)
+F3 <- predict(mAltB,InData12)  
+F4 <- predict(mGndSpd,InData12)
+F5 <- predict(mVSpd,InData12)
+
+
+M1 <- predict(mLatitude,InData12)
+M2 <- predict(mLongitude,InData12)
+M3 <- predict(mAltB,InData12)  
+M4 <- predict(mGndSpd,InData12)
+M5 <- predict(mVSpd,InData12)
+
+```
+
+
+
+```{r}
+install.packages("mi")
+library(mi)
+
+mi_test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+mi_test$Latitude<- as.data.frame.vector(mi_test$Latitude)
+mi_test$Longitude<- as.vector(mi_test$Longitude)
+
+
+mi_data <- mi(mi_test[3:4], seed = 335)
+```
+
+
+
+# Fitting method
+```{r}
+library(data.table)
+library(forecast)
+library(plyr)
+library(readr)
+library(imputeTS)
+library(dplyr)
+
+train <- read_csv("~/Box/Advance NL Class/Contest1/train_with_extra_var_and_into.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test_with_extra_var_and_into.csv")
+InData12 <- test
+
+output <- matrix(ncol=30, nrow=833)
+
+for (i in unique(train$ID)){
+new_train <- train %>% filter(ID==i)
+
+ts_fit = function(new_train) {
+  VSpd <- ts(new_train$VSpd,frequency = 16)
+  EndLatitude <- new_train$EndLatitude
+  startLatitude <- new_train$startLatitude
+  EndLongitude <- new_train$EndLongitude
+  startLongitude <- new_train$startLongitude
+  startAltB <- new_train$startAltB
+  EndAltB <- new_train$EndAltB
+  AvgLatitude <- new_train$AvgLatitude
+  
+  EndVSpd <- new_train$EndVSpd
+  startVSpd <- new_train$startVSpd
+  EndGndSpd <- new_train$EndGndSpd
+  startGndSpd <- new_train$startGndSpd
+  AvgVSpd <- new_train$AvgVSpd
+  AvgGndSpd <- new_train$AvgGndSpd
+  
+  fit <- tslm(VSpd ~ trend  + season    + EndVSpd+ startVSpd +EndGndSpd+startGndSpd+EndLatitude+startLatitude +startLongitude+ EndLongitude+startAltB+EndAltB+AvgVSpd+AvgGndSpd )
+  return(fit)
+}
+
+model_fit<- ts_fit(new_train)
+forecast <- forecast(model_fit, newdata = InData12)
+  
+M1<- as.data.frame(forecast$mean)
+output[,i] <- M1$x
+
+}
+
+as.data.frame(output)
+
+
+#V14as.data.frame(rowSums(as.data.frame(output))/30)
+
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+while (i <= 833){
+  
+  if(test$VSpd[1:833]== "NA"){test$VSpd[i]=V14[i]}
+}
+```
+
+```{r,warning=FALSE}
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+ 
+
+summary(train)
+
+library(imputeTS)
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "stine" )
+
+}
+}
+test1<- test
+
+
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "linear" )
+}
+}
+
+test2<- test
+
+test <- (test2+ test1) /2
+
+
+as.data.frame(M1)
+test[5011:8484,3] = M1
+test[5011:8484,4] = M2
+test[5011:8484,5] = M3
+test[5011:8484,6] = M4
+test[5011:8484,7] = M5
+
+test[834:5010,3] = F1
+test[834:5010,4] = F2
+test[834:5010,5] = F3
+test[834:5010,6] = F4
+test[834:5010,7] = F5
+
+#test[1:833,7] = F7$`rowSums(as.data.frame(output))/30`
+
+
+
+# zoe 
+write.csv(test, file="Ali_submission_wide.csv", row.names=FALSE)
+
+
+##### Change the file path!!! #####
+submission = test
+submission$IDTime = paste(submission$ID, submission$Time)
+## Find the row index of the test set
+k = as.vector(by(submission$ID,submission$ID,length))
+a = lapply(k, function(x){seq(1,x,by=16)})
+m = c(0,cumsum(k)[-80])
+b = lapply(1:80,function(i){a[[i]]+m[i]})
+i = unlist(b)
+## Remove the test set from prediction and generate the long table
+dat = submission[-i,-(1:2)]
+dat = reshape2::melt(dat,id="IDTime")
+dat$ID = paste(dat$IDTime, dat$variable)
+## Write the data into a new submission file
+write.csv(dat[,4:3], file="Kaggle_submission_long.csv", row.names=FALSE)
+```
+

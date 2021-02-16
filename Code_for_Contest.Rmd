@@ -1,0 +1,60 @@
+---
+title: "Untitled"
+author: "Ali Alghaithi"
+date: "11/25/2020"
+output: pdf_document
+---
+
+```{r,warning=FALSE}
+library(readr)
+train <- read_csv("~/Box/Advance NL Class/Contest1/train.csv")
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+wide <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_wide.csv")
+long <- read_csv("~/Box/Advance NL Class/Contest1/sample_submission_long.csv")
+ 
+
+
+library(imputeTS)
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "stine" )
+
+}
+}
+test1<- test
+
+
+test <- read_csv("~/Box/Advance NL Class/Contest1/test.csv")
+for (i in unique(test$ID)){
+for (j in 3:7){
+test[test$ID == i, j] = na.interpolation(test[test$ID == i, j], option = "linear" )
+}
+}
+
+test2<- test
+
+test <- (test2+ test1) /2
+
+
+
+
+# for Dr. Zoe 
+write.csv(test, file="Ali_submission_wide.csv", row.names=FALSE)
+
+
+##### Change the file path!!! #####
+submission = test
+submission$IDTime = paste(submission$ID, submission$Time)
+## Find the row index of the test set
+k = as.vector(by(submission$ID,submission$ID,length))
+a = lapply(k, function(x){seq(1,x,by=16)})
+m = c(0,cumsum(k)[-80])
+b = lapply(1:80,function(i){a[[i]]+m[i]})
+i = unlist(b)
+## Remove the test set from prediction and generate the long table
+dat = submission[-i,-(1:2)]
+dat = reshape2::melt(dat,id="IDTime")
+dat$ID = paste(dat$IDTime, dat$variable)
+## Write the data into a new submission file
+write.csv(dat[,4:3], file="Kaggle_submission_long.csv", row.names=FALSE)
+```
